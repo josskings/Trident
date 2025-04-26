@@ -269,6 +269,42 @@ paths:
                     type: integer
                     description: 大桌等待人數
   
+  # 票號查詢端點
+  /queue/ticket/{id}:
+    get:
+      summary: 查詢特定票號
+      description: 根據票號查詢候位詳情
+      tags:
+        - 候位管理
+      operationId: getTicketInfo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 票號
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 票號詳情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueTicket'
+        '404':
+          description: 找不到票號
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "找不到票號"
+                  ticket_id:
+                    type: integer
+                    description: 查詢的票號
+  
   # 統計數據端點
   /statistics:
     get:
@@ -405,28 +441,28 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Customer'
+                  $ref: '#/components/schemas/BlacklistedCustomer'
         '401':
           description: 未授權
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
-  /blacklist/{customer_id}:
-    put:
-      summary: 更新黑名單狀態
-      description: 將客戶加入或移出黑名單
+        '403':
+          description: 權限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      summary: 添加客戶到黑名單
+      description: 將客戶添加到黑名單
       tags:
         - 黑名單管理
-      operationId: updateBlacklistStatus
-      parameters:
-        - name: customer_id
-          in: path
-          required: true
-          description: 客戶ID
-          schema:
-            type: integer
+      operationId: addToBlacklist
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -434,27 +470,78 @@ paths:
             schema:
               type: object
               required:
-                - blacklisted
+                - phone_number
               properties:
-                blacklisted:
-                  type: boolean
-                  description: 是否列入黑名單
+                phone_number:
+                  type: string
+                  description: 客戶手機號碼
+                reason:
+                  type: string
+                  description: 加入黑名單原因
+      responses:
+        '201':
+          description: 成功添加到黑名單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlacklistedCustomer'
+        '400':
+          description: 無效請求
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 未授權
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 權限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /blacklist/{id}:
+    delete:
+      summary: 從黑名單中移除客戶
+      description: 將客戶從黑名單中移除
+      tags:
+        - 黑名單管理
+      operationId: removeFromBlacklist
       security:
         - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 客戶ID
+          schema:
+            type: integer
       responses:
         '200':
-          description: 成功更新黑名單狀態
+          description: 成功從黑名單中移除
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  success:
-                    type: boolean
                   message:
                     type: string
+                    example: "客戶已從黑名單中移除"
+                  customer_id:
+                    type: integer
+                    description: 客戶ID
         '401':
           description: 未授權
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 權限不足
           content:
             application/json:
               schema:
@@ -472,19 +559,8 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: 使用 JWT 進行身份驗證，格式為 'Bearer {token}'
-    
+  
   schemas:
-    Error:
-      type: object
-      properties:
-        error:
-          type: string
-          description: 錯誤訊息
-        code:
-          type: integer
-          description: HTTP 狀態碼
-    
     Employee:
       type: object
       properties:
@@ -500,14 +576,6 @@ components:
         role:
           type: string
           description: 員工角色
-        created_at:
-          type: string
-          format: date-time
-          description: 創建時間
-        updated_at:
-          type: string
-          format: date-time
-          description: 更新時間
     
     Customer:
       type: object
@@ -523,12 +591,98 @@ components:
           description: 未到次數
         blacklisted:
           type: boolean
-          description: 是否列入黑名單
+          description: 是否被列入黑名單
         created_at:
           type: string
           format: date-time
           description: 創建時間
-        updated_at:
+    
+    TableType:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 桌型ID
+        name:
+          type: string
+          description: 桌型名稱
+        min_capacity:
+          type: integer
+          description: 最小容納人數
+        max_capacity:
+          type: integer
+          description: 最大容納人數
+        description:
+          type: string
+          description: 桌型描述
+    
+    QueueTicket:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 票ID
+        ticket_number:
+          type: integer
+          description: 票號
+        party_size:
+          type: integer
+          description: 派對人數
+        queue_date:
+          type: string
+          format: date
+          description: 排隊日期
+        queue_time:
           type: string
           format: date-time
-          description: 更新時間
+          description: 排隊時間
+        status:
+          type: string
+          enum: [waiting, seated, no_show, cancelled]
+          description: 狀態
+        is_remote:
+          type: boolean
+          description: 是否遠端取號
+        waiting_count_at_creation:
+          type: integer
+          description: 創建時的等待人數
+        seated_time:
+          type: string
+          format: date-time
+          description: 入座時間
+        verification_status:
+          type: boolean
+          description: 驗證狀態
+        phone_number:
+          type: string
+          description: 客戶手機號碼
+        table_type_name:
+          type: string
+          description: 桌型名稱
+    
+    BlacklistedCustomer:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 客戶ID
+        phone_number:
+          type: string
+          description: 客戶手機號碼
+        no_show_count:
+          type: integer
+          description: 未到次數
+        blacklisted_at:
+          type: string
+          format: date-time
+          description: 加入黑名單時間
+        reason:
+          type: string
+          description: 加入黑名單原因
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: 錯誤消息

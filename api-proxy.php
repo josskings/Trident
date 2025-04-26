@@ -291,6 +291,61 @@ $router = new ApiRouter($api_path, $request_method, $request_body);
 $router->route();
 
 /**
+ * 票號查詢處理器類
+ */
+class TicketInfoHandler extends ApiHandler {
+    private $ticket_id;
+    
+    public function __construct($db_connection, $request_data) {
+        parent::__construct($db_connection, $request_data);
+        $this->ticket_id = $request_data['ticket_id'];
+    }
+    
+    public function handleRequest() {
+        // 記錄請求到日誌
+        file_put_contents('ticket_info_request.log', date('Y-m-d H:i:s') . ' - 查詢票號: ' . $this->ticket_id . "\n", FILE_APPEND);
+        
+        // 查詢票號信息
+        $ticket_info = $this->getTicketInfo();
+        
+        if ($ticket_info) {
+            // 返回票號信息
+            $this->sendResponse($ticket_info);
+        } else {
+            // 如果找不到票號，返回 404
+            $this->sendError('找不到票號: ' . $this->ticket_id, 404);
+        }
+    }
+    
+    private function getTicketInfo() {
+        try {
+            // 準備 SQL 查詢
+            $sql = "SELECT qt.id, qt.ticket_number, qt.party_size, qt.queue_date, qt.queue_time, 
+                    qt.status, qt.is_remote, qt.verification_status, qt.seated_time, 
+                    c.phone_number, tt.name as table_type_name
+                    FROM queue_tickets qt
+                    JOIN customers c ON qt.customer_id = c.id
+                    JOIN table_types tt ON qt.table_type_id = tt.id
+                    WHERE qt.ticket_number = :ticket_id AND qt.queue_date = CURDATE()";
+            
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(':ticket_id', $this->ticket_id, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            if ($stmt->rowCount() > 0) {
+                return $stmt->fetch(PDO::FETCH_ASSOC);
+            } else {
+                return null;
+            }
+        } catch (Exception $e) {
+            // 記錄錯誤到日誌
+            file_put_contents('ticket_info_error.log', date('Y-m-d H:i:s') . ' - 錯誤: ' . $e->getMessage() . "\n", FILE_APPEND);
+            return null;
+        }
+    }
+}
+
+/**
  * 身份驗證處理器類
  */
 class AuthHandler extends ApiHandler {
@@ -1695,4 +1750,5 @@ if ((strpos($api_path, 'statistics') === 0 || strpos($api_path, 'api/statistics'
 // 如果沒有匹配的 API 端點，返回 404
 http_response_code(404);
 echo json_encode(['error' => '找不到請求的端點']);
+
 ?>
