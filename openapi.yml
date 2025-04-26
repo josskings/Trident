@@ -1,0 +1,534 @@
+openapi: 3.0.0
+info:
+  title: 餐廳候位系統 API
+  description: 提供餐廳候位系統的所有功能，包括取號、查詢、管理等
+  version: 1.0.0
+servers:
+  - url: http://localhost/restaurant-queue-system/api-proxy.php/api/v1
+    description: 開發環境
+
+paths:
+  # 認證端點
+  /auth/login:
+    post:
+      summary: 員工登入
+      description: 使用用戶名和密碼驗證員工身份
+      tags:
+        - 身份驗證
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  description: 員工用戶名
+                password:
+                  type: string
+                  description: 員工密碼
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: JWT 身份驗證令牌
+                  employee:
+                    $ref: '#/components/schemas/Employee'
+                  _links:
+                    type: object
+                    properties:
+                      self:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/auth/login"
+                      logout:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/auth/logout"
+        '401':
+          description: 無效的憑證
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /auth/logout:
+    post:
+      summary: 員工登出
+      description: 登出員工並使當前令牌失效
+      tags:
+        - 身份驗證
+      operationId: logout
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "登出成功"
+                  _links:
+                    type: object
+                    properties:
+                      login:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/auth/login"
+        '401':
+          description: 未提供有效的身份驗證令牌
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  # 驗證碼管理 (改進為資源導向)
+  /verifications:
+    post:
+      summary: 請求驗證碼
+      description: 為遠端取號發送驗證碼到客戶手機
+      tags:
+        - 驗證管理
+      operationId: createVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone_number
+              properties:
+                phone_number:
+                  type: string
+                  description: 客戶手機號碼
+      responses:
+        '201':
+          description: 驗證碼已發送
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "驗證碼已發送"
+                  code:
+                    type: string
+                    description: 驗證碼（僅用於測試環境）
+                  expires_at:
+                    type: string
+                    format: date-time
+                    description: 驗證碼過期時間
+                  _links:
+                    type: object
+                    properties:
+                      self:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/verifications/{id}"
+                      verify:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/verifications/{id}/verify"
+        '400':
+          description: 無效請求或黑名單電話
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /verifications/{id}/verify:
+    post:
+      summary: 驗證驗證碼
+      description: 驗證發送到客戶手機的驗證碼
+      tags:
+        - 驗證管理
+      operationId: verifyCode
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 驗證請求ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  description: 驗證碼
+      responses:
+        '200':
+          description: 驗證成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "驗證成功"
+                  customer_id:
+                    type: integer
+                    description: 客戶ID
+                  phone_number:
+                    type: string
+                    description: 客戶手機號碼
+                  _links:
+                    type: object
+                    properties:
+                      self:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/verifications/{id}"
+                      queue:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/queue/remote"
+        '400':
+          description: 無效或過期的驗證碼
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 找不到驗證請求
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  # 候位管理端點 - 前端
+  /queue/status:
+    get:
+      summary: 獲取當前候位狀態
+      description: 獲取當前候位號碼和等待人數
+      tags:
+        - 候位管理
+      operationId: getQueueStatus
+      responses:
+        '200':
+          description: 當前候位狀態
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current_number_small:
+                    type: integer
+                    description: 當前小桌號碼
+                  current_number_medium:
+                    type: integer
+                    description: 當前中桌號碼
+                  current_number_large:
+                    type: integer
+                    description: 當前大桌號碼
+                  waiting_count_small:
+                    type: integer
+                    description: 小桌等待人數
+                  waiting_count_medium:
+                    type: integer
+                    description: 中桌等待人數
+                  waiting_count_large:
+                    type: integer
+                    description: 大桌等待人數
+  
+  # 統計數據端點
+  /statistics:
+    get:
+      summary: 獲取統計數據
+      description: 獲取指定日期範圍的候位統計數據
+      tags:
+        - 統計管理
+      operationId: getStatistics
+      parameters:
+        - name: start_date
+          in: query
+          description: 開始日期 (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: 結束日期 (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功獲取統計數據
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_tickets:
+                    type: integer
+                    description: 總票數
+                  completed_tickets:
+                    type: integer
+                    description: 已完成票數
+                  cancelled_tickets:
+                    type: integer
+                    description: 已取消票數
+                  no_show_tickets:
+                    type: integer
+                    description: 未到票數
+                  queue_type_distribution:
+                    type: object
+                    properties:
+                      remote:
+                        type: integer
+                        description: 遠端取號數量
+                      onsite:
+                        type: integer
+                        description: 現場取號數量
+                  table_type_counts:
+                    type: object
+                    description: 各桌型票數
+                    additionalProperties:
+                      type: integer
+                  status_counts:
+                    type: object
+                    description: 各狀態票數
+                    additionalProperties:
+                      type: integer
+                  avg_wait_time:
+                    type: object
+                    properties:
+                      small:
+                        type: integer
+                        description: 小桌平均候位時間（分鐘）
+                      medium:
+                        type: integer
+                        description: 中桌平均候位時間（分鐘）
+                      large:
+                        type: integer
+                        description: 大桌平均候位時間（分鐘）
+                  start_date:
+                    type: string
+                    format: date
+                    description: 查詢開始日期
+                  end_date:
+                    type: string
+                    format: date
+                    description: 查詢結束日期
+                  _links:
+                    type: object
+                    properties:
+                      self:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/statistics?start_date=2025-04-26&end_date=2025-04-26"
+                      queue_status:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/queue/status"
+                      blacklist:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            example: "/api/v1/blacklist"
+        '401':
+          description: 未授權
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 權限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # 黑名單管理端點
+  /blacklist:
+    get:
+      summary: 獲取黑名單客戶
+      description: 獲取所有被列入黑名單的客戶
+      tags:
+        - 黑名單管理
+      operationId: getBlacklist
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功獲取黑名單
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+        '401':
+          description: 未授權
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /blacklist/{customer_id}:
+    put:
+      summary: 更新黑名單狀態
+      description: 將客戶加入或移出黑名單
+      tags:
+        - 黑名單管理
+      operationId: updateBlacklistStatus
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          description: 客戶ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - blacklisted
+              properties:
+                blacklisted:
+                  type: boolean
+                  description: 是否列入黑名單
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功更新黑名單狀態
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '401':
+          description: 未授權
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 找不到客戶
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 使用 JWT 進行身份驗證，格式為 'Bearer {token}'
+    
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: 錯誤訊息
+        code:
+          type: integer
+          description: HTTP 狀態碼
+    
+    Employee:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 員工ID
+        name:
+          type: string
+          description: 員工姓名
+        username:
+          type: string
+          description: 員工用戶名
+        role:
+          type: string
+          description: 員工角色
+        created_at:
+          type: string
+          format: date-time
+          description: 創建時間
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新時間
+    
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 客戶ID
+        phone_number:
+          type: string
+          description: 客戶手機號碼
+        no_show_count:
+          type: integer
+          description: 未到次數
+        blacklisted:
+          type: boolean
+          description: 是否列入黑名單
+        created_at:
+          type: string
+          format: date-time
+          description: 創建時間
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新時間

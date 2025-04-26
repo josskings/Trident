@@ -1,0 +1,11 @@
+RewriteEngine On
+
+# 將 /restaurant-queue-system/api/ 的請求重定向到 /restaurant-queue-system/api/index.php
+RewriteRule ^api/(.*)$ api/index.php [L]
+
+# 允許跨域請求
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization"
+</IfModule>

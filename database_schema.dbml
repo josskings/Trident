@@ -1,0 +1,148 @@
+// Restaurant Queue Management System Database Schema
+
+// Table for employees who can create queue numbers on-site
+Table employees {
+  id int [pk, increment]
+  name varchar(100) [not null]
+  username varchar(50) [not null, unique]
+  password_hash varchar(255) [not null]
+  role varchar(50) [not null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    username
+    role
+  }
+}
+
+// Table for customers
+Table customers {
+  id int [pk, increment]
+  phone_number varchar(20) [not null, unique]
+  no_show_count int [default: 0]
+  blacklisted boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    phone_number
+    blacklisted
+  }
+}
+
+// Table for table types (based on seating capacity)
+Table table_types {
+  id int [pk, increment]
+  name varchar(50) [not null]
+  min_capacity int [not null]
+  max_capacity int [not null]
+  description varchar(255)
+  
+  indexes {
+    (min_capacity, max_capacity)
+  }
+}
+
+// Table for queue tickets
+Table queue_tickets {
+  id int [pk, increment]
+  ticket_number int [not null]
+  customer_id int [not null]
+  table_type_id int [not null]
+  party_size int [not null]
+  queue_date date [not null]
+  queue_time timestamp [not null]
+  status enum('waiting', 'seated', 'no_show', 'cancelled') [not null]
+  is_remote boolean [not null]
+  waiting_count_at_creation int [not null]
+  seated_time timestamp
+  verification_code varchar(6)
+  verification_status boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    (queue_date, ticket_number)
+    (queue_date, status)
+    customer_id
+    table_type_id
+    status
+  }
+}
+
+// Table for SMS logs
+Table sms_logs {
+  id int [pk, increment]
+  customer_id int [not null]
+  queue_ticket_id int [not null]
+  message_content text [not null]
+  sent_time timestamp [not null]
+  status enum('sent', 'failed', 'delivered') [not null]
+  
+  indexes {
+    customer_id
+    queue_ticket_id
+  }
+}
+
+// Table for verification codes
+Table verification_codes {
+  id int [pk, increment]
+  customer_id int [not null]
+  code varchar(6) [not null]
+  created_at timestamp [default: `now()`]
+  expires_at timestamp [not null]
+  verified boolean [default: false]
+  
+  indexes {
+    customer_id
+    code
+    expires_at
+  }
+}
+
+// Table for queue status
+Table queue_status {
+  id int [pk, increment]
+  queue_date date [not null, unique]
+  current_number_small int [default: 0]
+  current_number_medium int [default: 0]
+  current_number_large int [default: 0]
+  last_issued_small int [default: 0]
+  last_issued_medium int [default: 0]
+  last_issued_large int [default: 0]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    queue_date
+  }
+}
+
+// Table for statistics
+Table queue_statistics {
+  id int [pk, increment]
+  queue_date date [not null]
+  table_type_id int [not null]
+  is_peak_hour boolean [not null]
+  avg_wait_time int
+  total_customers int
+  no_show_count int
+  remote_queue_count int
+  onsite_queue_count int
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    queue_date
+    table_type_id
+    is_peak_hour
+  }
+}
+
+// Define relationships
+Ref: queue_tickets.customer_id > customers.id
+Ref: queue_tickets.table_type_id > table_types.id
+Ref: sms_logs.customer_id > customers.id
+Ref: sms_logs.queue_ticket_id > queue_tickets.id
+Ref: verification_codes.customer_id > customers.id
+Ref: queue_statistics.table_type_id > table_types.id

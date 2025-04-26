@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>餐廳候位系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+        }
+        .queue-card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .queue-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .waiting-count {
+            font-size: 1.2rem;
+            color: #6c757d;
+        }
+        .nav-tabs {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-center flex-grow-1">餐廳候位系統</h1>
+            <button id="logout-btn" class="btn btn-outline-danger d-none">登出</button>
+        </div>
+        
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="status-tab" data-bs-toggle="tab" data-bs-target="#status" type="button" role="tab" aria-controls="status" aria-selected="true">候位狀態</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="remote-tab" data-bs-toggle="tab" data-bs-target="#remote" type="button" role="tab" aria-controls="remote" aria-selected="false">遠端取號</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="onsite-tab" data-bs-toggle="tab" data-bs-target="#onsite" type="button" role="tab" aria-controls="onsite" aria-selected="false">現場取號 (員工)</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin" type="button" role="tab" aria-controls="admin" aria-selected="false">後台管理</button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="myTabContent">
+            <!-- 候位狀態頁面 -->
+            <div class="tab-pane fade show active" id="status" role="tabpanel" aria-labelledby="status-tab">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card queue-card">
+                            <div class="card-header bg-primary text-white">
+                                小桌 (1-2人)
+                            </div>
+                            <div class="card-body text-center">
+                                <p>目前叫號</p>
+                                <div class="queue-number" id="current-small">-</div>
+                                <p class="waiting-count">等待人數: <span id="waiting-small">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card queue-card">
+                            <div class="card-header bg-success text-white">
+                                中桌 (3-4人)
+                            </div>
+                            <div class="card-body text-center">
+                                <p>目前叫號</p>
+                                <div class="queue-number" id="current-medium">-</div>
+                                <p class="waiting-count">等待人數: <span id="waiting-medium">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card queue-card">
+                            <div class="card-header bg-warning text-dark">
+                                大桌 (5人以上)
+                            </div>
+                            <div class="card-body text-center">
+                                <p>目前叫號</p>
+                                <div class="queue-number" id="current-large">-</div>
+                                <p class="waiting-count">等待人數: <span id="waiting-large">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        查詢我的候位號碼
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group mb-3" id="ticket-search-container">                            
+                            <button class="btn btn-primary" type="button" id="check-ticket">查詢</button>
+                        </div>
+                        <div id="ticket-details" class="d-none">
+                            <h5>候位詳情</h5>
+                            <table class="table">
+                                <tbody>
+                                    <tr>
+                                        <th>候位號碼</th>
+                                        <td id="ticket-number"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>桌型</th>
+                                        <td id="table-type"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>人數</th>
+                                        <td id="party-size"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>狀態</th>
+                                        <td id="ticket-status"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>取號時間</th>
+                                        <td id="queue-time"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 遠端取號頁面 -->
+            <div class="tab-pane fade" id="remote" role="tabpanel" aria-labelledby="remote-tab">
+                <div class="card">
+                    <div class="card-header">
+                        遠端取號
+                    </div>
+                    <div class="card-body">
+                        <div id="step1">
+                            <h5>步驟 1: 輸入手機號碼</h5>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="remote-phone-number" placeholder="請輸入手機號碼">
+                                <button class="btn btn-primary" type="button" id="request-verification-btn">獲取驗證碼</button>
+                            </div>
+                            <div class="alert alert-info d-none" id="code-sent-alert">
+                                驗證碼已發送到您的手機，請查收
+                            </div>
+                        </div>
+                        
+                        <div id="step2" class="d-none">
+                            <h5>步驟 2: 輸入驗證碼</h5>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="verification-code" placeholder="請輸入驗證碼">
+                                <button class="btn btn-primary" type="button" id="verify-code">驗證</button>
+                            </div>
+                            <div class="alert alert-danger d-none" id="code-error-alert">
+                                驗證碼錯誤或已過期
+                            </div>
+                        </div>
+                        
+                        <div id="step3" class="d-none">
+                            <h5>步驟 3: 選擇人數</h5>
+                            <div class="form-group mb-3">
+                                <label for="party-size-select">用餐人數</label>
+                                <select class="form-control" id="party-size-select">
+                                    <option value="1">1人</option>
+                                    <option value="2">2人</option>
+                                    <option value="3">3人</option>
+                                    <option value="4">4人</option>
+                                    <option value="5">5人</option>
+                                    <option value="6">6人</option>
+                                    <option value="7">7人</option>
+                                    <option value="8">8人</option>
+                                    <option value="9">9人</option>
+                                    <option value="10">10人</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-success" type="button" id="create-remote-ticket">取號</button>
+                        </div>
+                        
+                        <div id="step4" class="d-none">
+                            <h5>取號成功!</h5>
+                            <div class="alert alert-success">
+                                您的候位號碼是: <span id="remote-ticket-number" class="fw-bold"></span>
+                            </div>
+                            <p>目前叫號: <span id="remote-current-number"></span></p>
+                            <p>前面等待人數: <span id="remote-waiting-count"></span></p>
+                            <p>您可以隨時回到「候位狀態」頁面查看最新狀態</p>
+                            <button class="btn btn-primary" type="button" id="back-to-start">返回</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 現場取號頁面 (員工) -->
+            <div class="tab-pane fade" id="onsite" role="tabpanel" aria-labelledby="onsite-tab">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        員工登入
+                    </div>
+                    <div class="card-body">
+                        <div id="login-form">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">用戶名</label>
+                                <input type="text" class="form-control" id="username">
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">密碼</label>
+                                <input type="password" class="form-control" id="password">
+                            </div>
+                            <button type="button" class="btn btn-primary" id="login-btn">登入</button>
+                            <div class="alert alert-danger mt-3 d-none" id="login-error">
+                                用戶名或密碼錯誤
+                            </div>
+                        </div>
+                        
+                        <div id="onsite-queue-form" class="d-none">
+                            <h5>現場取號</h5>
+                            <div class="mb-3">
+                                <label for="onsite-phone" class="form-label">客戶手機號碼</label>
+                                <input type="text" class="form-control" id="onsite-phone">
+                            </div>
+                            <div class="mb-3">
+                                <label for="onsite-party-size" class="form-label">用餐人數</label>
+                                <select class="form-control" id="onsite-party-size">
+                                    <option value="1">1人</option>
+                                    <option value="2">2人</option>
+                                    <option value="3">3人</option>
+                                    <option value="4">4人</option>
+                                    <option value="5">5人</option>
+                                    <option value="6">6人</option>
+                                    <option value="7">7人</option>
+                                    <option value="8">8人</option>
+                                    <option value="9">9人</option>
+                                    <option value="10">10人</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-success" id="create-onsite-ticket">取號</button>
+                            <div class="alert alert-success mt-3 d-none" id="onsite-success">
+                                取號成功! 號碼: <span id="onsite-ticket-number"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card d-none" id="staff-controls">
+                    <div class="card-header">
+                        叫號管理
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">小桌 (1-2人)</div>
+                                    <div class="card-body">
+                                        <p>目前叫號: <span id="staff-current-small">-</span></p>
+                                        <p>等待人數: <span id="staff-waiting-small">-</span></p>
+                                        <button class="btn btn-primary" id="call-next-small">叫下一位</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card">
+                                    <div class="card-header bg-success text-white">中桌 (3-4人)</div>
+                                    <div class="card-body">
+                                        <p>目前叫號: <span id="staff-current-medium">-</span></p>
+                                        <p>等待人數: <span id="staff-waiting-medium">-</span></p>
+                                        <button class="btn btn-success" id="call-next-medium">叫下一位</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card">
+                                    <div class="card-header bg-warning text-dark">大桌 (5人以上)</div>
+                                    <div class="card-body">
+                                        <p>目前叫號: <span id="staff-current-large">-</span></p>
+                                        <p>等待人數: <span id="staff-waiting-large">-</span></p>
+                                        <button class="btn btn-warning" id="call-next-large">叫下一位</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h5>目前等待的客人</h5>
+                            <div class="table-responsive">
+                                <table class="table table-striped" id="waiting-tickets-table">
+                                    <thead>
+                                        <tr>
+                                            <th>號碼</th>
+                                            <th>桌型</th>
+                                            <th>人數</th>
+                                            <th>電話</th>
+                                            <th>取號時間</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- 等待中的客人列表 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 後台管理頁面 -->
+            <div class="tab-pane fade" id="admin" role="tabpanel" aria-labelledby="admin-tab">
+                <div class="alert alert-info">
+                    請先在「現場取號」頁面登入員工帳號
+                </div>
+                
+                <div class="card mb-4 d-none" id="admin-panel">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs" id="adminTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="records-tab" data-bs-toggle="tab" data-bs-target="#records" type="button" role="tab" aria-controls="records" aria-selected="true">候位記錄</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="blacklist-tab" data-bs-toggle="tab" data-bs-target="#blacklist" type="button" role="tab" aria-controls="blacklist" aria-selected="false">黑名單管理</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="statistics-tab" data-bs-toggle="tab" data-bs-target="#statistics" type="button" role="tab" aria-controls="statistics" aria-selected="false">統計資料</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div class="tab-content" id="adminTabContent">
+                            <!-- 候位記錄 -->
+                            <div class="tab-pane fade show active" id="records" role="tabpanel" aria-labelledby="records-tab">
+                                <div class="mb-3 row">
+                                    <div class="col-md-4">
+                                        <label for="record-date" class="form-label">日期</label>
+                                        <input type="date" class="form-control" id="record-date">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="record-status" class="form-label">狀態</label>
+                                        <select class="form-control" id="record-status">
+                                            <option value="">全部</option>
+                                            <option value="waiting">等待中</option>
+                                            <option value="seated">已入座</option>
+                                            <option value="no_show">未到</option>
+                                            <option value="cancelled">已取消</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button class="btn btn-primary form-control" id="search-records">查詢</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-striped" id="records-table">
+                                        <thead>
+                                            <tr>
+                                                <th>號碼</th>
+                                                <th>桌型</th>
+                                                <th>人數</th>
+                                                <th>電話</th>
+                                                <th>取號時間</th>
+                                                <th>入座時間</th>
+                                                <th>狀態</th>
+                                                <th>取號方式</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- 候位記錄列表 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- 黑名單管理 -->
+                            <div class="tab-pane fade" id="blacklist" role="tabpanel" aria-labelledby="blacklist-tab">
+                                <div class="card mb-3">
+                                    <div class="card-header">手動新增黑名單</div>
+                                    <div class="card-body">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <input type="text" class="form-control" id="add-blacklist-phone" placeholder="輸入電話號碼">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <button class="btn btn-danger" id="add-to-blacklist">加入黑名單</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <button class="btn btn-primary" id="refresh-blacklist">刷新列表</button>
+                                </div>
+                                
+                                <div class="table-responsive">
+                                    <table class="table table-striped" id="blacklist-table">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>電話號碼</th>
+                                                <th>失約次數</th>
+                                                <th>加入時間</th>
+                                                <th>操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- 黑名單列表 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- 統計資料 -->
+                            <div class="tab-pane fade" id="statistics" role="tabpanel" aria-labelledby="statistics-tab">
+                                <div class="mb-3 row">
+                                    <div class="col-md-4">
+                                        <label for="stats-start-date" class="form-label">開始日期</label>
+                                        <input type="date" class="form-control" id="stats-start-date">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="stats-end-date" class="form-label">結束日期</label>
+                                        <input type="date" class="form-control" id="stats-end-date">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button class="btn btn-primary form-control" id="search-stats">查詢</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card mb-3">
+                                            <div class="card-header">平均候位時間 (分鐘)</div>
+                                            <div class="card-body">
+                                                <canvas id="wait-time-chart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card mb-3">
+                                            <div class="card-header">取號方式分佈</div>
+                                            <div class="card-body">
+                                                <canvas id="queue-type-chart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card mb-3">
+                                            <div class="card-header">候位票狀態分佈</div>
+                                            <div class="card-body">
+                                                <canvas id="status-chart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card mb-3">
+                                            <div class="card-header">每小時候位票數量</div>
+                                            <div class="card-body">
+                                                <canvas id="hourly-chart"></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+# 忽略日誌文件
+*.log
+
+# 忽略臨時文件
+*.tmp
+*.temp
+
+# 忽略系統文件
+.DS_Store
+Thumbs.db
+
+# 忽略 IDE 和編輯器文件
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# 忽略 PHP 相關文件
+vendor/
+composer.lock
+
+# 忽略環境配置文件
+.env
+.env.local
+.env.*.local
+
+# 忽略 Node.js 相關文件
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
